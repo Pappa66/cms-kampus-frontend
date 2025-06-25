@@ -1,19 +1,31 @@
-type Props = {
-  message: string
-  type?: 'info' | 'error' | 'success'
+import React from 'react';
+
+interface NotificationProps {
+  message: string;
+  type?: 'info' | 'error' | 'success';
+  onClose: () => void; // Wajib ada untuk menutup notifikasi
 }
 
-export default function Notification({ message, type = 'info' }: Props) {
-  const color =
+const Notification: React.FC<NotificationProps> = ({ message, type = 'info', onClose }) => {
+  const colorClass =
     type === 'success'
-      ? 'green'
+      ? 'bg-green-100 text-green-700'
       : type === 'error'
-      ? 'red'
-      : 'blue'
+      ? 'bg-red-100 text-red-700'
+      : 'bg-blue-100 text-blue-700';
 
   return (
-    <div className={`bg-${color}-100 text-${color}-700 p-3 rounded mb-4`}>
-      {message}
+    <div className={`${colorClass} p-3 rounded mb-4 flex justify-between items-center`}>
+      <span>{message}</span>
+      <button
+        onClick={onClose}
+        className="ml-4 p-1 rounded-full text-current hover:bg-opacity-50 focus:outline-none focus:ring-2 focus:ring-current"
+        aria-label="Close notification"
+      >
+        &times;
+      </button>
     </div>
-  )
-}
+  );
+};
+
+export default Notification;
