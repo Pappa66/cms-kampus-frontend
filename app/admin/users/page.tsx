@@ -1,66 +1,34 @@
+// cms-kampus-frontend/app/admin/users/page.tsx
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import AdminLayout from '@/app/components/AdminLayout'; // Path relatif yang umum digunakan
-import FormInput from '@/app/components/FormInput'; // Komponen FormInput Anda
-import Notification from '@/app/components/Notification'; // Komponen Notification Anda
+import AdminLayout from '@/app/components/AdminLayout';
+import FormInput from '@/app/components/FormInput';
+import Notification from '@/app/components/Notification';
+import { fetchAPI } from '@/app/lib/api';
 import { useRouter } from 'next/navigation';
-
-// Asumsi fetchAPI Anda ada dan bisa mengirim token (seperti yang sudah kita diskusikan)
-// Jika Anda masih menggunakan fetch() langsung, sesuaikan function di bawah ini
-interface ApiResponse {
-  message: string;
-  data?: any;
-}
-
-const fetchAPI = async (
-  endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-  token: string, // Token wajib untuk endpoint admin
-  body?: any
-): Promise<ApiResponse> => {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-
-  const config: RequestInit = {
-    method: method,
-    headers: headers,
-  };
-
-  if (body) {
-    config.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, config);
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || `API Error: ${response.statusText}`);
-  }
-
-  return response.json();
-};
-
 
 interface User {
   id: string;
-  username?: string | null; // Opsional karena di skema Prisma dibuat String?
-  name?: string | null;     // Opsional
+  username?: string | null;
+  name?: string | null;
   email: string;
+  password?: string;
   role: 'SUPERADMIN' | 'ADMIN' | 'DOSEN' | 'MAHASISWA';
   createdAt: string;
   updatedAt: string;
   biodata?: {
+    // id: string; // Hapus ID di sini karena ini adalah representasi data dari DB, bukan untuk form input
     name: string;
     nim?: string | null;
     nidn?: string | null;
     prodi?: string | null;
     fakultas?: string | null;
-    tgl_lahir: string;
+    tgl_lahir: string; // Ubah menjadi string karena form input type="date" memberikan string
   };
   adminAccess?: {
+    // id: string; // Hapus ID di sini
     canEdit: boolean;
     canDelete: boolean;
     canView: boolean;
@@ -74,7 +42,21 @@ interface NotificationState {
 }
 
 type UserForm = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>> & {
-  password?: string; // Password hanya untuk input form, tidak ada di User interface
+  password?: string;
+  biodata?: {
+    name?: string;
+    nim?: string;
+    nidn?: string;
+    prodi?: string;
+    fakultas?: string;
+    tgl_lahir?: string; // Pastikan ini string untuk form input
+  };
+  adminAccess?: {
+    canEdit?: boolean;
+    canDelete?: boolean;
+    canView?: boolean;
+    canDownload?: boolean;
+  };
 };
 
 export default function UserManagementPage() {
@@ -85,10 +67,11 @@ export default function UserManagementPage() {
     email: '',
     password: '',
     name: '',
-    role: 'MAHASISWA', // Default role saat membuat user
+    role: 'MAHASISWA',
     biodata: {
       name: '',
       tgl_lahir: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD
+      nim: '', nidn: '', prodi: '', fakultas: '',
     },
     adminAccess: {
       canEdit: false, canDelete: false, canView: true, canDownload: false
@@ -97,16 +80,15 @@ export default function UserManagementPage() {
   const [notification, setNotification] = useState<NotificationState | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null); // Role dari user yang sedang login
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const role = localStorage.getItem('userRole'); // Ambil role user yang login
+    const role = localStorage.getItem('userRole');
     setCurrentUserRole(role);
 
     if (!token || role !== 'SUPERADMIN') {
-      // Hanya Superadmin yang boleh mengakses halaman ini
-      router.push('/login-admin'); // Atau halaman unauthorized
+      router.push('/login');
       return;
     }
     fetchUsers();
@@ -125,23 +107,27 @@ export default function UserManagementPage() {
     } catch (error: any) {
       console.error('Failed to fetch users:', error);
       setNotification({ message: error.message || 'Gagal mengambil data pengguna.', type: 'error' });
+      if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type, checked } = e.target as HTMLInputElement;
-
-    // Handle nested biodata and adminAccess fields
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    // Pengecekan tipe eksplisit untuk properti 'checked'
+    const checked = (e.target as HTMLInputElement).checked; 
+  
     if (name.startsWith('biodata.')) {
       const field = name.split('.')[1];
       setForm(prevForm => ({
         ...prevForm,
         biodata: {
           ...prevForm.biodata,
-          [field]: type === 'date' ? new Date(value).toISOString() : value,
-        } as any // Cast to any to bypass strict type checking for dynamic field
+          [field]: value,
+        } as UserForm['biodata']
       }));
     } else if (name.startsWith('adminAccess.')) {
       const field = name.split('.')[1];
@@ -149,8 +135,8 @@ export default function UserManagementPage() {
         ...prevForm,
         adminAccess: {
           ...prevForm.adminAccess,
-          [field]: checked,
-        } as any
+          [field]: checked, // Gunakan 'checked' di sini
+        } as UserForm['adminAccess']
       }));
     } else {
       setForm({
@@ -166,38 +152,39 @@ export default function UserManagementPage() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found.');
 
-      // Clone form data to modify before sending
       const dataToSend: any = { ...form };
 
-      // Clean up biodata if not applicable or empty
-      if (dataToSend.biodata && Object.values(dataToSend.biodata).every(val => val === '' || val === null || val === undefined)) {
-        delete dataToSend.biodata;
-      } else if (dataToSend.biodata && dataToSend.biodata.tgl_lahir) {
-        // Ensure tgl_lahir is a valid ISO string date
+      if (dataToSend.biodata && dataToSend.biodata.tgl_lahir) {
+        // Pastikan tgl_lahir diubah ke ISO string untuk backend
         dataToSend.biodata.tgl_lahir = new Date(dataToSend.biodata.tgl_lahir).toISOString();
+      } else if (dataToSend.biodata) {
+        dataToSend.biodata.tgl_lahir = null;
       }
 
-      // Clean up adminAccess if not applicable or empty
-      if (dataToSend.role !== 'ADMIN' && dataToSend.role !== 'SUPERADMIN') {
-        delete dataToSend.adminAccess;
-      } else if (dataToSend.adminAccess && Object.values(dataToSend.adminAccess).every(val => val === '' || val === null || val === undefined || val === false || val === true)) {
-        // If all adminAccess fields are default (false/true) or empty, ensure it's not sent if not needed
-        // Or ensure it's only sent if the role applies
-        // This logic can be refined based on exact requirements for default adminAccess
+      if (!['MAHASISWA', 'DOSEN'].includes(dataToSend.role)) {
+        delete dataToSend.biodata;
       }
+
+      if (!['ADMIN', 'SUPERADMIN'].includes(dataToSend.role)) {
+        delete dataToSend.adminAccess;
+      } else if (dataToSend.adminAccess) {
+        dataToSend.adminAccess.canEdit = Boolean(dataToSend.adminAccess.canEdit);
+        dataToSend.adminAccess.canDelete = Boolean(dataToSend.adminAccess.canDelete);
+        dataToSend.adminAccess.canView = Boolean(dataToSend.adminAccess.canView);
+        dataToSend.adminAccess.canDownload = Boolean(dataToSend.adminAccess.canDownload);
+      }
+
 
       let response;
       if (editingUserId) {
-        // Update existing user
         response = await fetchAPI(`/api/admin/users/${editingUserId}`, 'PUT', token, dataToSend);
         setNotification({ message: response.message || 'Pengguna berhasil diperbarui!', type: 'success' });
       } else {
-        // Create new user
         response = await fetchAPI('/api/admin/users', 'POST', token, dataToSend);
         setNotification({ message: response.message || 'Pengguna berhasil dibuat!', type: 'success' });
       }
-      resetForm(); // Reset form and editing state
-      fetchUsers(); // Refresh user list
+      resetForm();
+      fetchUsers();
     } catch (error: any) {
       console.error('Failed to save user:', error);
       setNotification({ message: error.message || 'Gagal menyimpan pengguna.', type: 'error' });
@@ -205,11 +192,10 @@ export default function UserManagementPage() {
   };
 
   const handleEdit = (user: User) => {
-    // Populate form with user data for editing
     setForm({
       username: user.username || '',
       email: user.email,
-      password: '', // Password should not be pre-filled
+      password: '',
       name: user.name || '',
       role: user.role,
       biodata: user.biodata ? {
@@ -218,8 +204,9 @@ export default function UserManagementPage() {
         nidn: user.biodata.nidn || '',
         prodi: user.biodata.prodi || '',
         fakultas: user.biodata.fakultas || '',
+        // Pastikan format YYYY-MM-DD untuk input type="date"
         tgl_lahir: user.biodata.tgl_lahir ? new Date(user.biodata.tgl_lahir).toISOString().split('T')[0] : '',
-      } : { // Default empty biodata if not present
+      } : {
         name: '', nim: '', nidn: '', prodi: '', fakultas: '', tgl_lahir: new Date().toISOString().split('T')[0],
       },
       adminAccess: user.adminAccess ? {
@@ -227,12 +214,12 @@ export default function UserManagementPage() {
         canDelete: user.adminAccess.canDelete,
         canView: user.adminAccess.canView,
         canDownload: user.adminAccess.canDownload,
-      } : { // Default empty adminAccess if not present
+      } : {
         canEdit: false, canDelete: false, canView: true, canDownload: false
       }
     });
     setEditingUserId(user.id);
-    setNotification(null); // Clear notification
+    setNotification(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -243,7 +230,7 @@ export default function UserManagementPage() {
 
         const response = await fetchAPI(`/api/admin/users/${id}`, 'DELETE', token);
         setNotification({ message: response.message || 'Pengguna berhasil dihapus!', type: 'success' });
-        fetchUsers(); // Refresh user list
+        fetchUsers();
       } catch (error: any) {
         console.error('Failed to delete user:', error);
         setNotification({ message: error.message || 'Gagal menghapus pengguna.', type: 'error' });
@@ -261,6 +248,7 @@ export default function UserManagementPage() {
       biodata: {
         name: '',
         tgl_lahir: new Date().toISOString().split('T')[0],
+        nim: '', nidn: '', prodi: '', fakultas: '',
       },
       adminAccess: {
         canEdit: false, canDelete: false, canView: true, canDownload: false
@@ -272,8 +260,14 @@ export default function UserManagementPage() {
 
   const closeNotification = () => setNotification(null);
 
+  if (currentUserRole === null) {
+    return (
+      <AdminLayout>
+        <p className="text-center py-8">Memverifikasi akses...</p>
+      </AdminLayout>
+    );
+  }
 
-  // Render hanya jika userRole adalah SUPERADMIN
   if (currentUserRole !== 'SUPERADMIN') {
     return (
       <AdminLayout>
@@ -294,7 +288,6 @@ export default function UserManagementPage() {
         />
       )}
 
-      {/* Form Tambah/Edit Pengguna */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold mb-4">{editingUserId ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h2>
         <form onSubmit={handleSubmit}>
@@ -322,7 +315,7 @@ export default function UserManagementPage() {
               value={form.password || ''}
               onChange={handleChange}
               placeholder={editingUserId ? 'Biarkan kosong jika tidak ingin mengubah password' : ''}
-              required={!editingUserId} // Password required only for new user
+              required={!editingUserId}
             />
             <FormInput
               label="Nama Lengkap"
@@ -350,7 +343,6 @@ export default function UserManagementPage() {
             </div>
           </div>
 
-          {/* Biodata Fields */}
           <h3 className="text-lg font-semibold mb-3 border-b pb-2">Biodata (Opsional)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <FormInput
@@ -365,7 +357,7 @@ export default function UserManagementPage() {
               label="Tanggal Lahir"
               name="biodata.tgl_lahir"
               type="date"
-              value={form.biodata?.tgl_lahir ? new Date(form.biodata.tgl_lahir).toISOString().split('T')[0] : ''}
+              value={form.biodata?.tgl_lahir || ''}
               onChange={handleChange}
             />
             {form.role === 'MAHASISWA' && (
@@ -420,7 +412,6 @@ export default function UserManagementPage() {
             )}
           </div>
 
-          {/* Admin Access Fields (Hanya tampil jika role adalah Admin atau Superadmin) */}
           {(form.role === 'ADMIN' || form.role === 'SUPERADMIN') && (
             <>
               <h3 className="text-lg font-semibold mb-3 border-b pb-2">Admin Access (Opsional)</h3>
@@ -493,7 +484,6 @@ export default function UserManagementPage() {
         </form>
       </div>
 
-      {/* Daftar Pengguna */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold mb-4">Daftar Pengguna</h2>
         {loading ? (

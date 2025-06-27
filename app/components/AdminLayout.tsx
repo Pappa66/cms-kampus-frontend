@@ -20,7 +20,7 @@
         const role = localStorage.getItem('userRole');
 
         if (!token) {
-          router.push('/login-admin');
+          router.push('/login');
         } else {
           setUserRole(role);
         }
@@ -29,7 +29,8 @@
       const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        router.push('/login-admin');
+        localStorage.removeItem('userName');
+        router.push('/login');
       };
 
       return (
@@ -53,6 +54,7 @@
               </button>
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2">
+              {/* Menu Navigasi Utama */}
               <Link
                 href="/admin/dashboard"
                 className={`flex items-center px-4 py-2 rounded-md ${
@@ -61,33 +63,38 @@
               >
                 Dashboard
               </Link>
-              {/* Menu untuk Admin/Superadmin */}
-              {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
-                <>
-                  <Link
-                    href="/admin/konten"
-                    className={`flex items-center px-4 py-2 rounded-md ${
-                      pathname === '/admin/konten' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
-                    }`}
-                  >
-                    Konten (Post)
-                  </Link>
-                  <Link
-                    href="/admin/repository"
-                    className={`flex items-center px-4 py-2 rounded-md ${
-                      pathname === '/admin/repository' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
-                    }`}
-                  >
-                    Repository
-                  </Link>
-                  {/* Link Manajemen Menu dihapus */}
-                </>
-              )}
+              <Link
+                href="/admin/repository"
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  pathname === '/admin/repository' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
+                }`}
+              >
+                Repository
+              </Link>
+              <Link
+                href="/admin/konten"
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  pathname === '/admin/konten' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
+                }`}
+              >
+                Konten (Post)
+              </Link>
+              {/* Hapus link Manajemen Menu jika tidak jadi */}
+              {/*
+              <Link
+                href="/admin/menu"
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  pathname === '/admin/menu' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
+                }`}
+              >
+                Manajemen Menu
+              </Link>
+              */}
 
-              {/* Menu khusus untuk Superadmin */}
+              {/* Link khusus untuk Superadmin */}
               {userRole === 'SUPERADMIN' && (
                 <Link
-                  href="/admin/users" // Link untuk manajemen pengguna tetap ada
+                  href="/admin/users"
                   className={`flex items-center px-4 py-2 rounded-md ${
                     pathname === '/admin/users' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
                   }`}
@@ -95,6 +102,18 @@
                   Manajemen Akun
                 </Link>
               )}
+              {/* Link baru untuk Manajemen Link PMB */}
+              {(userRole === 'SUPERADMIN' || userRole === 'ADMIN') && (
+                <Link
+                  href="/admin/settings" // Asumsi route baru untuk pengaturan
+                  className={`flex items-center px-4 py-2 rounded-md ${
+                    pathname === '/admin/settings' ? 'bg-gray-700 font-semibold' : 'hover:bg-gray-700'
+                  }`}
+                >
+                  Pengaturan
+                </Link>
+              )}
+
               {/* Link Logout */}
               <button
                 onClick={handleLogout}

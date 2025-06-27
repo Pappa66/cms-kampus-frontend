@@ -1,15 +1,25 @@
-'use client'
-import React from 'react'
-import Navbar from './Navbar'
+    // cms-kampus-frontend/app/components/Layout.tsx
+    import React from 'react';
+    import Navbar from './Navbar'; // Pastikan import Navbar di sini
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      <Navbar />
-      <main className="flex-1 p-4 max-w-4xl mx-auto">{children}</main>
-      <footer className="text-center py-4 text-sm text-gray-500 border-t">
-        &copy; {new Date().getFullYear()} Kampus XYZ
-      </footer>
-    </div>
-  )
-}
+    interface LayoutProps {
+      children: React.ReactNode;
+    }
+
+    const Layout: React.FC<LayoutProps> = ({ children }) => {
+      return (
+        <div>
+          <Navbar /> {/* Navbar harus ada di sini */}
+          <main className="container mx-auto px-4 py-8">
+            {children}
+          </main>
+          {/* Opsional: Footer */}
+          {/* <footer className="bg-gray-800 text-white p-4 text-center mt-8">
+            <p>&copy; 2024 CMS Kampus. All rights reserved.</p>
+          </footer> */}
+        </div>
+      );
+    };
+
+    export default Layout;
+    

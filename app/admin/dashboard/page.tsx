@@ -1,7 +1,9 @@
+// app/admin/dashboard/page.tsx
 'use client'
+
 import { useEffect, useState } from 'react'
-import AdminLayout from '../../components/AdminLayout'
-import { useRouter } from 'next/navigation'
+import AdminLayout from '../../components/AdminLayout' // Menggunakan path relatif Anda
+import { useRouter } from 'next/navigation' // Tambahkan useRouter
 
 type Stats = {
   totalPosts: number
@@ -14,7 +16,7 @@ type Stats = {
   }
 }
 
-// Asumsi fetchAPI Anda ada dan bisa mengirim token
+// Asumsi fetchAPI Anda ada dan bisa mengirim token (seperti yang sudah kita diskusikan)
 interface ApiResponse {
   message: string;
   data?: any;
@@ -54,19 +56,19 @@ const fetchAPI = async (
   return response.json();
 };
 
-
 export default function AdminDashboard() {
-  const router = useRouter()
+  const router = useRouter() // Inisialisasi useRouter
   const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true) // Tambahkan state loading
+  const [error, setError] = useState<string | null>(null) // Tambahkan state error
 
   useEffect(() => {
     const token = localStorage.getItem('token')
 
+    // Redirect jika tidak ada token
     if (!token) {
-      router.push('/login-admin')
-      return
+      router.push('/login'); // REDIRECT KE /login
+      return;
     }
 
     const fetchDashboardStats = async () => {
@@ -98,7 +100,8 @@ export default function AdminDashboard() {
         if (err.message === 'Unauthorized or Forbidden: Please login again.') {
           localStorage.removeItem('token');
           localStorage.removeItem('userRole');
-          router.push('/login-admin');
+          localStorage.removeItem('userName'); // Hapus juga nama user
+          router.push('/login'); // REDIRECT KE /login
         }
       } finally {
         setLoading(false);
@@ -106,7 +109,7 @@ export default function AdminDashboard() {
     };
 
     fetchDashboardStats();
-  }, [router])
+  }, [router]) // Tambahkan router ke dependency array
 
   if (loading) return (
     <AdminLayout>
@@ -120,26 +123,22 @@ export default function AdminDashboard() {
     </AdminLayout>
   )
 
-  // Pastikan stats dan totalUsers ada sebelum merender StatCard
-  if (!stats || !stats.totalUsers) {
-    return (
-      <AdminLayout>
-        <p className="text-center py-8">Data statistik tidak lengkap atau tidak tersedia.</p>
-      </AdminLayout>
-    );
-  }
+  if (!stats) return ( // Jika tidak ada stats setelah loading
+    <AdminLayout>
+      <p className="text-center py-8">Tidak ada data statistik yang tersedia.</p>
+    </AdminLayout>
+  )
 
   return (
     <AdminLayout>
       <h1 className="text-2xl font-bold mb-6">Dashboard Admin</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Menggunakan optional chaining (?.) untuk akses yang lebih aman */}
         <StatCard label="Total Postingan" value={stats.totalPosts} />
         <StatCard label="Total Repository" value={stats.totalRepositories} />
-        <StatCard label="Super Admin" value={stats.totalUsers?.SUPERADMIN || 0} />
-        <StatCard label="Admin" value={stats.totalUsers?.ADMIN || 0} />
-        <StatCard label="Dosen" value={stats.totalUsers?.DOSEN || 0} />
-        <StatCard label="Mahasiswa" value={stats.totalUsers?.MAHASISWA || 0} />
+        <StatCard label="Super Admin" value={stats.totalUsers.SUPERADMIN} />
+        <StatCard label="Admin" value={stats.totalUsers.ADMIN} />
+        <StatCard label="Dosen" value={stats.totalUsers.DOSEN} />
+        <StatCard label="Mahasiswa" value={stats.totalUsers.MAHASISWA} />
       </div>
     </AdminLayout>
   )
@@ -147,9 +146,9 @@ export default function AdminDashboard() {
 
 function StatCard({ label, value }: { label: string, value: number }) {
   return (
-    <div className="bg-white rounded-lg shadow p-4 text-center">
+    <div className="bg-white rounded-lg shadow p-4 text-center"> {/* Gunakan rounded-lg untuk konsistensi */}
       <p className="text-gray-500 text-sm">{label}</p>
-      <p className="text-3xl font-bold text-indigo-600 mt-1">{value}</p>
+      <p className="text-3xl font-bold text-indigo-600 mt-1">{value}</p> {/* Perbesar teks dan tambahkan warna */}
     </div>
   )
 }
