@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/app/components/AdminLayout';
-import FormInput from '@/app/components/FormInput';
+import FormInput from '@/app/components/FormInput'; // Menggunakan FormInput yang baru
 import Notification from '@/app/components/Notification';
 import { fetchAPI } from '@/app/lib/api'; // Asumsi fetchAPI ada di sini
 import { useRouter } from 'next/navigation';
@@ -52,7 +52,7 @@ export default function ContentManagementPage() {
     const userRole = localStorage.getItem('userRole');
 
     if (!token || (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN')) {
-      router.push('/login');
+      router.push('/login'); // Redirect ke /login
       return;
     }
     fetchPosts();
@@ -71,6 +71,10 @@ export default function ContentManagementPage() {
     } catch (error: any) {
       console.error('Failed to fetch posts:', error);
       setNotification({ message: error.message || 'Gagal mengambil data konten.', type: 'error' });
+      // Redirect to login if unauthorized or forbidden
+      if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -123,7 +127,7 @@ export default function ContentManagementPage() {
       formData.append('content', form.content || '');
       formData.append('published', String(form.published));
       if (file) formData.append('file', file);
-      if (image) formData.append('image', image);
+      if (image) formData.append('image', image); // <-- Pastikan backend menerima field 'image'
 
       let response;
       if (editingPostId) {
@@ -140,6 +144,10 @@ export default function ContentManagementPage() {
     } catch (error: any) {
       console.error('Failed to save post:', error);
       setNotification({ message: error.message || 'Gagal menyimpan konten.', type: 'error' });
+       // Redirect to login if unauthorized or forbidden
+       if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     }
   };
 
@@ -171,6 +179,10 @@ export default function ContentManagementPage() {
       } catch (error: any) {
         console.error('Failed to delete post:', error);
         setNotification({ message: error.message || 'Gagal menghapus konten.', type: 'error' });
+         // Redirect to login if unauthorized or forbidden
+         if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+          router.push('/login');
+        }
       }
     }
   };
@@ -225,6 +237,8 @@ export default function ContentManagementPage() {
               value={form.slug || ''}
               onChange={handleChange}
               placeholder="Akan otomatis jika kosong"
+              readOnly={!!editingPostId} // Slug read-only saat edit
+              className={editingPostId ? "bg-gray-100" : ""}
             />
             <div>
               <label htmlFor="type" className="block text-sm font-medium text-gray-700">Tipe Konten</label>
@@ -270,27 +284,24 @@ export default function ContentManagementPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label htmlFor="file" className="block text-sm font-medium text-gray-700">Lampiran File (PDF, DOCX, dll.)</label>
-              <input
-                type="file"
-                id="file"
+              <FormInput
+                label="Lampiran File (PDF, DOCX, dll.)"
                 name="file"
+                type="file"
                 onChange={handleFileChange}
-                className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" // Tambahkan accept types
               />
               {editingPostId && form.fileUrl && !file && (
                 <p className="text-sm text-gray-500 mt-1">File saat ini: <a href={`${process.env.NEXT_PUBLIC_API_URL}${form.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Lihat</a> (Biarkan kosong untuk mempertahankan file lama)</p>
               )}
             </div>
             <div>
-              <label htmlFor="image" className="block text-sm font-medium text-gray-700">Gambar (Thumbnail)</label>
-              <input
+              <FormInput
+                label="Gambar (Thumbnail)"
+                name="image" // Ganti 'image' agar konsisten dengan FormData
                 type="file"
-                id="image"
-                name="image"
-                accept="image/*"
                 onChange={handleImageChange}
-                className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none"
+                accept="image/*"
               />
               {editingPostId && form.imageUrl && !image && (
                 <p className="text-sm text-gray-500 mt-1">Gambar saat ini: <a href={`${process.env.NEXT_PUBLIC_API_URL}${form.imageUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Lihat</a> (Biarkan kosong untuk mempertahankan gambar lama)</p>

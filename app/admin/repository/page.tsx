@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/app/components/AdminLayout';
-import FormInput from '@/app/components/FormInput';
+import FormInput from '@/app/components/FormInput'; // Menggunakan FormInput yang baru
 import Notification from '@/app/components/Notification';
 import { fetchAPI } from '@/app/lib/api'; // Asumsi fetchAPI Anda ada
 import { useRouter } from 'next/navigation';
@@ -57,7 +57,7 @@ export default function AdminRepositoryManagementPage() {
     setCurrentUserRole(userRole);
 
     if (!token || (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN')) {
-      router.push('/login');
+      router.push('/login'); // Redirect ke /login
       return;
     }
     fetchRepositories();
@@ -77,6 +77,10 @@ export default function AdminRepositoryManagementPage() {
     } catch (error: any) {
       console.error('Failed to fetch repositories:', error);
       setNotification({ message: error.message || 'Gagal mengambil data repositori.', type: 'error' });
+      // Redirect to login if unauthorized or forbidden
+      if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     } finally {
       setLoading(false);
     }
@@ -126,6 +130,10 @@ export default function AdminRepositoryManagementPage() {
     } catch (error: any) {
       console.error('Failed to save repository:', error);
       setNotification({ message: error.message || 'Gagal menyimpan repositori.', type: 'error' });
+       // Redirect to login if unauthorized or forbidden
+       if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     }
   };
 
@@ -154,6 +162,10 @@ export default function AdminRepositoryManagementPage() {
       } catch (error: any) {
         console.error('Failed to delete repository:', error);
         setNotification({ message: error.message || 'Gagal menghapus repositori.', type: 'error' });
+         // Redirect to login if unauthorized or forbidden
+         if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+          router.push('/login');
+        }
       }
     }
   };
@@ -202,6 +214,10 @@ export default function AdminRepositoryManagementPage() {
     } catch (error: any) {
       console.error('Failed to download repository:', error);
       setNotification({ message: error.message || 'Gagal mengunduh file.', type: 'error' });
+       // Redirect to login if unauthorized or forbidden
+       if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+        router.push('/login');
+      }
     }
   };
 
@@ -221,7 +237,13 @@ export default function AdminRepositoryManagementPage() {
 
   const closeNotification = () => setNotification(null);
 
-  const prodiOptions = ['Ilmu Administrasi Negara', 'Ilmu Pemerintahan'];
+  const prodiOptions = [
+    { value: 'Ilmu Administrasi Negara', label: 'Ilmu Administrasi Negara' },
+    { value: 'Ilmu Pemerintahan', label: 'Ilmu Pemerintahan' },
+    { value: 'Sistem Informasi', label: 'Sistem Informasi' },
+    { value: 'Teknik Informatika', label: 'Teknik Informatika' },
+    // Tambahkan prodi lain jika ada
+  ];
 
 
   return (
@@ -249,22 +271,15 @@ export default function AdminRepositoryManagementPage() {
               onChange={handleChange}
               required
             />
-            <div>
-              <label htmlFor="prodi" className="block text-sm font-medium text-gray-700">Program Studi</label>
-              <select
-                id="prodi"
-                name="prodi"
-                value={form.prodi || ''}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-              >
-                <option value="">-- Pilih Program Studi --</option>
-                {prodiOptions.map(prodi => (
-                  <option key={prodi} value={prodi}>{prodi}</option>
-                ))}
-              </select>
-            </div>
+            <FormInput
+              label="Program Studi"
+              name="prodi"
+              type="select" // Menggunakan type select dari FormInput
+              value={form.prodi || ''}
+              onChange={handleChange}
+              options={prodiOptions}
+              required
+            />
           </div>
           
           <div className="mb-4">
@@ -283,14 +298,13 @@ export default function AdminRepositoryManagementPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label htmlFor="file" className="block text-sm font-medium text-gray-700">File Repositori (PDF, DOCX, dll.)</label>
-              <input
-                type="file"
-                id="file"
+              <FormInput
+                label="File Repositori (PDF, DOCX, dll.)"
                 name="file"
+                type="file"
                 onChange={handleFileChange}
-                className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none"
                 required={!editingRepoId} // Required only for new repo, optional for edit
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar" // Tambahkan accept types
               />
               {editingRepoId && form.fileUrl && !file && (
                 <p className="text-sm text-gray-500 mt-1">File saat ini: <a href={`${process.env.NEXT_PUBLIC_API_URL}${form.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Lihat</a> (Biarkan kosong untuk mempertahankan file lama)</p>

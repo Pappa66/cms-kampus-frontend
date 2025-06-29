@@ -5,7 +5,7 @@ import React from 'react';
 interface FormInputProps {
   label: string;
   name: string;
-  type: string;
+  type?: string; // Type bisa string, tapi juga bisa 'select', 'textarea', 'file'
   value: string | number; // Bisa string atau number untuk input type number
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void; // <--- PERBAIKAN DI SINI
   placeholder?: string;
@@ -15,12 +15,15 @@ interface FormInputProps {
   max?: string; // Untuk type="date" atau "number"
   rows?: number; // Untuk textarea
   options?: { value: string; label: string }[]; // Untuk select
+  readOnly?: boolean; // Untuk input readOnly
+  className?: string; // Untuk custom className pada input element
+  accept?: string; // Untuk input type file (misal: "image/*", ".pdf")
 }
 
 const FormInput: React.FC<FormInputProps> = ({
   label,
   name,
-  type,
+  type = 'text', // Default type
   value,
   onChange,
   placeholder,
@@ -30,6 +33,9 @@ const FormInput: React.FC<FormInputProps> = ({
   max,
   rows,
   options,
+  readOnly = false,
+  className,
+  accept,
 }) => {
   const inputId = name.replace(/\./g, '-'); // Simple ID for nesting
 
@@ -45,7 +51,8 @@ const FormInput: React.FC<FormInputProps> = ({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        readOnly={readOnly}
+        className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${className}`}
       />
     );
   } else if (type === 'select' && options) {
@@ -57,7 +64,7 @@ const FormInput: React.FC<FormInputProps> = ({
         onChange={onChange}
         required={required}
         disabled={disabled}
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${className}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -75,7 +82,8 @@ const FormInput: React.FC<FormInputProps> = ({
         onChange={onChange}
         required={required}
         disabled={disabled}
-        className="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none"
+        accept={accept} // Tambahkan accept attribute
+        className={`mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-md cursor-pointer bg-gray-50 focus:outline-none ${className}`}
       />
     );
   } else {
@@ -89,9 +97,10 @@ const FormInput: React.FC<FormInputProps> = ({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        readOnly={readOnly}
         min={min}
         max={max}
-        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${className}`}
       />
     );
   }

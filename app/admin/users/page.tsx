@@ -4,36 +4,34 @@
 
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/app/components/AdminLayout';
-import FormInput from '@/app/components/FormInput';
 import Notification from '@/app/components/Notification';
+import FormInput from '@/app/components/FormInput'; // Import FormInput
+import FormSelect from '@/app/components/FormSelect'; // Import FormSelect
 import { fetchAPI } from '@/app/lib/api';
 import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
-  username?: string | null;
-  name?: string | null;
+  username: string;
   email: string;
-  password?: string;
+  name: string | null;
   role: 'SUPERADMIN' | 'ADMIN' | 'DOSEN' | 'MAHASISWA';
   createdAt: string;
   updatedAt: string;
   biodata?: {
-    // id: string; // Hapus ID di sini karena ini adalah representasi data dari DB, bukan untuk form input
     name: string;
-    nim?: string | null;
-    nidn?: string | null;
-    prodi?: string | null;
-    fakultas?: string | null;
-    tgl_lahir: string; // Ubah menjadi string karena form input type="date" memberikan string
-  };
+    nim?: string;
+    nidn?: string;
+    prodi?: string;
+    fakultas?: string;
+    tgl_lahir?: string; // Tanggal lahir mungkin string dari API
+  } | null;
   adminAccess?: {
-    // id: string; // Hapus ID di sini
     canEdit: boolean;
     canDelete: boolean;
     canView: boolean;
     canDownload: boolean;
-  };
+  } | null;
 }
 
 interface NotificationState {
@@ -41,65 +39,26 @@ interface NotificationState {
   type: 'success' | 'error' | 'info';
 }
 
-type UserForm = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>> & {
-  password?: string;
-  biodata?: {
-    name?: string;
-    nim?: string;
-    nidn?: string;
-    prodi?: string;
-    fakultas?: string;
-    tgl_lahir?: string; // Pastikan ini string untuk form input
-  };
-  adminAccess?: {
-    canEdit?: boolean;
-    canDelete?: boolean;
-    canView?: boolean;
-    canDownload?: boolean;
-  };
-};
-
 export default function UserManagementPage() {
-  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
-  const [form, setForm] = useState<UserForm>({
-    username: '',
-    email: '',
-    password: '',
-    name: '',
-    role: 'MAHASISWA',
-    biodata: {
-      name: '',
-      tgl_lahir: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD
-      nim: '', nidn: '', prodi: '', fakultas: '',
-    },
-    adminAccess: {
-      canEdit: false, canDelete: false, canView: true, canDownload: false
-    }
-  });
   const [notification, setNotification] = useState<NotificationState | null>(null);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false); // State untuk modal
+  const [currentUser, setCurrentUser] = useState<User | null>(null); // State untuk user yang sedang diedit/ditambah
+  const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('userRole');
-    setCurrentUserRole(role);
-
-    if (!token || role !== 'SUPERADMIN') {
-      router.push('/login');
-      return;
-    }
     fetchUsers();
-  }, [router]);
+  }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found.');
-
+      if (!token) {
+        router.push('/login-admin');
+        return;
+      }
       const response = await fetchAPI('/api/admin/users', 'GET', token);
       if (response.data) {
         setUsers(response.data);
@@ -107,178 +66,59 @@ export default function UserManagementPage() {
     } catch (error: any) {
       console.error('Failed to fetch users:', error);
       setNotification({ message: error.message || 'Gagal mengambil data pengguna.', type: 'error' });
-      if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-        router.push('/login');
-      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    // Pengecekan tipe eksplisit untuk properti 'checked'
-    const checked = (e.target as HTMLInputElement).checked; 
-  
-    if (name.startsWith('biodata.')) {
-      const field = name.split('.')[1];
-      setForm(prevForm => ({
-        ...prevForm,
-        biodata: {
-          ...prevForm.biodata,
-          [field]: value,
-        } as UserForm['biodata']
-      }));
-    } else if (name.startsWith('adminAccess.')) {
-      const field = name.split('.')[1];
-      setForm(prevForm => ({
-        ...prevForm,
-        adminAccess: {
-          ...prevForm.adminAccess,
-          [field]: checked, // Gunakan 'checked' di sini
-        } as UserForm['adminAccess']
-      }));
-    } else {
-      setForm({
-        ...form,
-        [name]: value,
-      });
+  const handleDelete = async (userId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) {
+      return;
     }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found.');
-
-      const dataToSend: any = { ...form };
-
-      if (dataToSend.biodata && dataToSend.biodata.tgl_lahir) {
-        // Pastikan tgl_lahir diubah ke ISO string untuk backend
-        dataToSend.biodata.tgl_lahir = new Date(dataToSend.biodata.tgl_lahir).toISOString();
-      } else if (dataToSend.biodata) {
-        dataToSend.biodata.tgl_lahir = null;
+      if (!token) {
+        router.push('/login-admin');
+        return;
       }
-
-      if (!['MAHASISWA', 'DOSEN'].includes(dataToSend.role)) {
-        delete dataToSend.biodata;
-      }
-
-      if (!['ADMIN', 'SUPERADMIN'].includes(dataToSend.role)) {
-        delete dataToSend.adminAccess;
-      } else if (dataToSend.adminAccess) {
-        dataToSend.adminAccess.canEdit = Boolean(dataToSend.adminAccess.canEdit);
-        dataToSend.adminAccess.canDelete = Boolean(dataToSend.adminAccess.canDelete);
-        dataToSend.adminAccess.canView = Boolean(dataToSend.adminAccess.canView);
-        dataToSend.adminAccess.canDownload = Boolean(dataToSend.adminAccess.canDownload);
-      }
-
-
-      let response;
-      if (editingUserId) {
-        response = await fetchAPI(`/api/admin/users/${editingUserId}`, 'PUT', token, dataToSend);
-        setNotification({ message: response.message || 'Pengguna berhasil diperbarui!', type: 'success' });
-      } else {
-        response = await fetchAPI('/api/admin/users', 'POST', token, dataToSend);
-        setNotification({ message: response.message || 'Pengguna berhasil dibuat!', type: 'success' });
-      }
-      resetForm();
-      fetchUsers();
+      const response = await fetchAPI(`/api/admin/users/${userId}`, 'DELETE', token);
+      setNotification({ message: response.message || 'Pengguna berhasil dihapus.', type: 'success' });
+      fetchUsers(); // Refresh daftar pengguna
     } catch (error: any) {
-      console.error('Failed to save user:', error);
-      setNotification({ message: error.message || 'Gagal menyimpan pengguna.', type: 'error' });
+      console.error('Failed to delete user:', error);
+      setNotification({ message: error.message || 'Gagal menghapus pengguna.', type: 'error' });
     }
   };
 
-  const handleEdit = (user: User) => {
-    setForm({
-      username: user.username || '',
-      email: user.email,
-      password: '',
-      name: user.name || '',
-      role: user.role,
-      biodata: user.biodata ? {
-        name: user.biodata.name,
-        nim: user.biodata.nim || '',
-        nidn: user.biodata.nidn || '',
-        prodi: user.biodata.prodi || '',
-        fakultas: user.biodata.fakultas || '',
-        // Pastikan format YYYY-MM-DD untuk input type="date"
-        tgl_lahir: user.biodata.tgl_lahir ? new Date(user.biodata.tgl_lahir).toISOString().split('T')[0] : '',
-      } : {
-        name: '', nim: '', nidn: '', prodi: '', fakultas: '', tgl_lahir: new Date().toISOString().split('T')[0],
-      },
-      adminAccess: user.adminAccess ? {
-        canEdit: user.adminAccess.canEdit,
-        canDelete: user.adminAccess.canDelete,
-        canView: user.adminAccess.canView,
-        canDownload: user.adminAccess.canDownload,
-      } : {
-        canEdit: false, canDelete: false, canView: true, canDownload: false
-      }
-    });
-    setEditingUserId(user.id);
-    setNotification(null);
+  const handleOpenModal = (user: User | null) => {
+    setCurrentUser(user);
+    setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No token found.');
-
-        const response = await fetchAPI(`/api/admin/users/${id}`, 'DELETE', token);
-        setNotification({ message: response.message || 'Pengguna berhasil dihapus!', type: 'success' });
-        fetchUsers();
-      } catch (error: any) {
-        console.error('Failed to delete user:', error);
-        setNotification({ message: error.message || 'Gagal menghapus pengguna.', type: 'error' });
-      }
-    }
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setCurrentUser(null);
   };
 
-  const resetForm = () => {
-    setForm({
-      username: '',
-      email: '',
-      password: '',
-      name: '',
-      role: 'MAHASISWA',
-      biodata: {
-        name: '',
-        tgl_lahir: new Date().toISOString().split('T')[0],
-        nim: '', nidn: '', prodi: '', fakultas: '',
-      },
-      adminAccess: {
-        canEdit: false, canDelete: false, canView: true, canDownload: false
-      }
-    });
-    setEditingUserId(null);
-    setNotification(null);
+  const handleSaveUser = () => {
+    handleCloseModal();
+    fetchUsers(); // Refresh daftar user setelah simpan
+    setNotification({ message: 'Pengguna berhasil disimpan!', type: 'success' });
   };
 
   const closeNotification = () => setNotification(null);
 
-  if (currentUserRole === null) {
+  if (loading) {
     return (
       <AdminLayout>
-        <p className="text-center py-8">Memverifikasi akses...</p>
-      </AdminLayout>
-    );
-  }
-
-  if (currentUserRole !== 'SUPERADMIN') {
-    return (
-      <AdminLayout>
-        <p className="text-red-500 text-center py-8">Anda tidak memiliki akses ke halaman ini. Hanya Superadmin yang diizinkan.</p>
+        <p>Memuat daftar pengguna...</p>
       </AdminLayout>
     );
   }
 
   return (
     <AdminLayout>
-      <h1 className="text-2xl font-bold mb-6">Manajemen Akun Pengguna</h1>
+      <h1 className="text-2xl font-bold mb-6">Manajemen Pengguna</h1>
 
       {notification && (
         <Notification
@@ -288,248 +128,291 @@ export default function UserManagementPage() {
         />
       )}
 
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-4">{editingUserId ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h2>
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8 overflow-x-auto">
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => handleOpenModal(null)} // Tombol tambah user baru
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Tambah Pengguna Baru
+          </button>
+        </div>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Nama
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Username
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Email
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Role
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Aksi
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {users.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                  Tidak ada pengguna ditemukan.
+                </td>
+              </tr>
+            ) : (
+              users.map((user) => (
+                <tr key={user.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {user.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {user.username}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {user.email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {user.role}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => handleOpenModal(user)} // Tombol Edit user
+                      className="text-indigo-600 hover:text-indigo-900 mr-4"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(user.id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Hapus
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isModalOpen && (
+        <UserFormModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSaveUser}
+          user={currentUser}
+        />
+      )}
+    </AdminLayout>
+  );
+}
+
+// UserFormModal Component
+interface UserFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  user: User | null;
+}
+
+const UserFormModal: React.FC<UserFormModalProps> = ({ isOpen, onClose, onSave, user }) => {
+  const [formData, setFormData] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    password: '', // Password tidak di-load, harus diisi saat edit
+    name: user?.name || '',
+    role: user?.role || 'MAHASISWA', // Default role
+    // Biodata fields for new user
+    nim: user?.biodata?.nim || '',
+    nidn: user?.biodata?.nidn || '',
+    prodi: user?.biodata?.prodi || '',
+    fakultas: user?.biodata?.fakultas || '',
+    tgl_lahir: user?.biodata?.tgl_lahir ? new Date(user.biodata.tgl_lahir).toISOString().split('T')[0] : '', // Format tanggal untuk input
+  });
+  const [notification, setNotification] = useState<NotificationState | null>(null);
+  const router = useRouter();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login-admin');
+        return;
+      }
+
+      const payload: any = {
+        username: formData.username,
+        email: formData.email,
+        name: formData.name,
+        role: formData.role,
+      };
+
+      if (formData.password) { // Hanya kirim password jika diisi
+        payload.password = formData.password;
+      }
+
+      // Tambahkan biodata jika ada
+      const biodata = {
+        name: formData.name,
+        nim: formData.nim,
+        nidn: formData.nidn,
+        prodi: formData.prodi,
+        fakultas: formData.fakultas,
+        tgl_lahir: formData.tgl_lahir ? new Date(formData.tgl_lahir).toISOString() : undefined,
+      };
+
+      // Pastikan biodata hanya dikirim jika ada nilai yang relevan
+      const hasBiodata = Object.values(biodata).some(val => val !== '' && val !== undefined);
+      if (hasBiodata) {
+        payload.biodata = biodata;
+      }
+
+
+      let response;
+      if (user && user.id) {
+        // Update User
+        response = await fetchAPI(`/api/admin/users/${user.id}`, 'PUT', token, payload);
+      } else {
+        // Create New User
+        response = await fetchAPI('/api/admin/users', 'POST', token, payload);
+      }
+      setNotification({ message: response.message || 'Pengguna berhasil disimpan!', type: 'success' });
+      onSave(); // Panggil onSave untuk refresh data di parent
+    } catch (error: any) {
+      console.error('Failed to save user:', error);
+      setNotification({ message: error.message || 'Gagal menyimpan pengguna.', type: 'error' });
+    }
+  };
+
+  const closeNotification = () => setNotification(null);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
+      <div className="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-lg">
+        <h2 className="text-2xl font-bold mb-4">{user ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h2>
+        
+        {notification && (
+          <Notification
+            message={notification.message}
+            type={notification.type}
+            onClose={closeNotification}
+          />
+        )}
+
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <FormInput
-              label="Username"
-              name="username"
-              type="text"
-              value={form.username || ''}
-              onChange={handleChange}
-              required
-            />
-            <FormInput
-              label="Email"
-              name="email"
-              type="email"
-              value={form.email || ''}
-              onChange={handleChange}
-              required
-            />
-            <FormInput
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password || ''}
-              onChange={handleChange}
-              placeholder={editingUserId ? 'Biarkan kosong jika tidak ingin mengubah password' : ''}
-              required={!editingUserId}
-            />
-            <FormInput
-              label="Nama Lengkap"
-              name="name"
-              type="text"
-              value={form.name || ''}
-              onChange={handleChange}
-              required
-            />
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">Peran (Role)</label>
-              <select
-                id="role"
-                name="role"
-                value={form.role || 'MAHASISWA'}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                required
-              >
-                <option value="MAHASISWA">MAHASISWA</option>
-                <option value="DOSEN">DOSEN</option>
-                <option value="ADMIN">ADMIN</option>
-                <option value="SUPERADMIN">SUPERADMIN</option>
-              </select>
-            </div>
-          </div>
+          <FormInput
+            label="Nama Lengkap"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+          <FormInput
+            label="Username"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+          />
+          <FormInput
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+          <FormInput
+            label="Password"
+            name="password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder={user ? "Biarkan kosong jika tidak ingin mengubah" : "Masukkan password"}
+            required={!user} // Required only for new users
+          />
+          <FormSelect
+            label="Role"
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            options={[
+              { value: 'MAHASISWA', label: 'Mahasiswa' },
+              { value: 'DOSEN', label: 'Dosen' },
+              { value: 'ADMIN', label: 'Admin' },
+              { value: 'SUPERADMIN', label: 'Superadmin' },
+            ]}
+            required
+          />
 
-          <h3 className="text-lg font-semibold mb-3 border-b pb-2">Biodata (Opsional)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <FormInput
-              label="Nama di Biodata"
-              name="biodata.name"
-              type="text"
-              value={form.biodata?.name || ''}
-              onChange={handleChange}
-              placeholder="Sama dengan nama lengkap jika ada"
-            />
-             <FormInput
-              label="Tanggal Lahir"
-              name="biodata.tgl_lahir"
-              type="date"
-              value={form.biodata?.tgl_lahir || ''}
-              onChange={handleChange}
-            />
-            {form.role === 'MAHASISWA' && (
-              <>
-                <FormInput
-                  label="NIM"
-                  name="biodata.nim"
-                  type="text"
-                  value={form.biodata?.nim || ''}
-                  onChange={handleChange}
-                />
-                <FormInput
-                  label="Prodi"
-                  name="biodata.prodi"
-                  type="text"
-                  value={form.biodata?.prodi || ''}
-                  onChange={handleChange}
-                />
-                <FormInput
-                  label="Fakultas"
-                  name="biodata.fakultas"
-                  type="text"
-                  value={form.biodata?.fakultas || ''}
-                  onChange={handleChange}
-                />
-              </>
-            )}
-            {form.role === 'DOSEN' && (
-              <>
-                <FormInput
-                  label="NIDN"
-                  name="biodata.nidn"
-                  type="text"
-                  value={form.biodata?.nidn || ''}
-                  onChange={handleChange}
-                />
-                <FormInput
-                  label="Prodi"
-                  name="biodata.prodi"
-                  type="text"
-                  value={form.biodata?.prodi || ''}
-                  onChange={handleChange}
-                />
-                <FormInput
-                  label="Fakultas"
-                  name="biodata.fakultas"
-                  type="text"
-                  value={form.biodata?.fakultas || ''}
-                  onChange={handleChange}
-                />
-              </>
-            )}
-          </div>
+          {/* Biodata Fields (Optional for all roles, but important for Mahasiswa/Dosen) */}
+          <h3 className="text-xl font-semibold mt-6 mb-4">Detail Biodata (Opsional)</h3>
+          <FormInput
+            label="NIM (Mahasiswa)"
+            name="nim"
+            value={formData.nim}
+            onChange={handleChange}
+            placeholder="Nomor Induk Mahasiswa"
+          />
+          <FormInput
+            label="NIDN (Dosen)"
+            name="nidn"
+            value={formData.nidn}
+            onChange={handleChange}
+            placeholder="Nomor Induk Dosen Nasional"
+          />
+          <FormInput
+            label="Program Studi"
+            name="prodi"
+            value={formData.prodi}
+            onChange={handleChange}
+            placeholder="Program Studi"
+          />
+          <FormInput
+            label="Fakultas"
+            name="fakultas"
+            value={formData.fakultas}
+            onChange={handleChange}
+            placeholder="Fakultas"
+          />
+          <FormInput
+            label="Tanggal Lahir"
+            name="tgl_lahir"
+            type="date"
+            value={formData.tgl_lahir}
+            onChange={handleChange}
+          />
 
-          {(form.role === 'ADMIN' || form.role === 'SUPERADMIN') && (
-            <>
-              <h3 className="text-lg font-semibold mb-3 border-b pb-2">Admin Access (Opsional)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="flex items-center">
-                  <input
-                    id="canView"
-                    name="adminAccess.canView"
-                    type="checkbox"
-                    checked={form.adminAccess?.canView || false}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="canView" className="ml-2 block text-sm text-gray-900">Bisa Melihat</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="canEdit"
-                    name="adminAccess.canEdit"
-                    type="checkbox"
-                    checked={form.adminAccess?.canEdit || false}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="canEdit" className="ml-2 block text-sm text-gray-900">Bisa Mengedit</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="canDelete"
-                    name="adminAccess.canDelete"
-                    type="checkbox"
-                    checked={form.adminAccess?.canDelete || false}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="canDelete" className="ml-2 block text-sm text-gray-900">Bisa Menghapus</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="canDownload"
-                    name="adminAccess.canDownload"
-                    type="checkbox"
-                    checked={form.adminAccess?.canDownload || false}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="canDownload" className="ml-2 block text-sm text-gray-900">Bisa Mengunduh</label>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="flex justify-end space-x-4 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Batal
+            </button>
             <button
               type="submit"
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {editingUserId ? 'Perbarui Pengguna' : 'Tambah Pengguna'}
+              Simpan
             </button>
-            {editingUserId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Batal Edit
-              </button>
-            )}
           </div>
         </form>
       </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Daftar Pengguna</h2>
-        {loading ? (
-          <p>Memuat pengguna...</p>
-        ) : users.length === 0 ? (
-          <p>Belum ada pengguna yang terdaftar.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peran</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 whitespace-nowrap">{user.username || '-'}</td>
-                    <td className="py-3 px-4 whitespace-nowrap">{user.name || '-'}</td>
-                    <td className="py-3 px-4">{user.email}</td>
-                    <td className="py-3 px-4">{user.role}</td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => handleEdit(user)}
-                        className="font-medium text-blue-600 hover:underline mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="font-medium text-red-600 hover:underline"
-                      >
-                        Hapus
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </AdminLayout>
+    </div>
   );
-}
+};
