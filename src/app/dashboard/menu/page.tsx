@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import { NavItem } from '@/types';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, FileText } from 'lucide-react';
 
 export default function MenuManagementPage() {
   const [menuItems, setMenuItems] = useState<NavItem[]>([]);
@@ -70,31 +70,28 @@ export default function MenuManagementPage() {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">
           {menuItems.map((item) => (
-            <div key={item.id} className="border p-4 rounded-md bg-gray-50">
+            <div key={item.id} className="border p-4 rounded-md">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-800">{item.name}</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleCreateMenu(true, item.id)} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">Tambah Submenu</button>
-                  <button onClick={() => handleDelete(item.id, false)} className="p-2 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={16}/></button>
-                </div>
+                <span className="font-bold">{item.name}</span>
+                {(!item.submenus || item.submenus.length === 0) && item.post && (
+                  <Link href={`/dashboard/editor/${item.post.id}`} className="text-sm flex items-center gap-1 text-blue-600 hover:underline">
+                    <Edit size={14}/> Edit Konten
+                  </Link>
+                )}
+                <button onClick={() => handleDelete(item.id, false)} className="p-2 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={16}/></button>
               </div>
-              <div className="pl-4 mt-2 space-y-2 border-l-2 ml-2">
+              <div className="pl-6 mt-2 space-y-2 border-l-2 ml-2">
                 {item.submenus?.map((submenu) => (
                   <div key={submenu.id} className="flex justify-between items-center text-sm py-1">
                     <span>- {submenu.name}</span>
-                    <div className="flex items-center gap-2">
-                      <Link href={`/dashboard/editor/${submenu.post?.id}`} className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
+                    {submenu.post && (
+                      <Link href={`/dashboard/editor/${submenu.post.id}`} className="text-xs flex items-center gap-1 text-blue-600 hover:underline">
                         <Edit size={12}/> Edit Konten
                       </Link>
-                      <button onClick={() => handleDelete(submenu.id, true)} className="p-1 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={14}/></button>
-                    </div>
+                    )}
                   </div>
                 ))}
-                {(!item.submenus || item.submenus.length === 0) && item.post && (
-                    <Link href={`/dashboard/editor/${item.post.id}`} className="text-sm flex items-center gap-1 text-blue-600 hover:underline">
-                        <Edit size={14}/> Edit Konten Halaman Ini
-                    </Link>
-                )}
+                <button onClick={() => handleCreateMenu(true, item.id)} className="text-xs text-green-600 hover:underline mt-2">+ Tambah Submenu</button>
               </div>
             </div>
           ))}
