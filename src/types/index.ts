@@ -1,31 +1,24 @@
-export type UserRole = "public" | "mahasiswa" | "dosen" | "admin";
-
-// Tipe data lengkap untuk menu, submenu, dan post
-export interface Post {
-  id: string;
-  title: string;
-  slug: string;
-}
+// Definisikan tipe untuk MenuType agar bisa digunakan di semua file
+export type MenuType = 'INTERNAL' | 'EXTERNAL' | 'STATIC_PATH';
 
 export interface SubMenuItem {
-  id: string;
-  name: string;
-  href?: string | null;
-  post?: Post | null;
+    id: string;
+    name: string;
+    order: number;
+    type: MenuType;
+    href: string | null;
+    post: { id: string } | null;
+    postId: string | null;
+    menuItemId: string;
 }
 
 export interface NavItem {
-  id: string;
-  name: string;
-  href?: string | null;
-  post?: Post | null;
-  submenus?: SubMenuItem[];
-}
-export interface RepositoryItem {
-  id: string;
-  title: string;
-  author: string;
-  year: number;
-  studyProgram: string;
-  fileUrl: string;
+    id: string;
+    name: string;
+    order: number;
+    type: MenuType;
+    href: string | null;
+    post: { id: string } | null;
+    postId: string | null;
+    submenus: SubMenuItem[];
 }
