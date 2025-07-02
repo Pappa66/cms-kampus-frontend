@@ -40,6 +40,7 @@ export default function Header() {
         router.push('/');
     };
 
+    // --- FUNGSI renderLink YANG SUDAH DIPERBAIKI ---
     const renderLink = (item: NavItemType | SubMenuItemType) => {
         const isSubmenu = 'menuItemId' in item;
         const commonClasses = isSubmenu 
@@ -48,20 +49,28 @@ export default function Header() {
         
         const hasSubmenus = 'submenus' in item && item.submenus && item.submenus.length > 0;
 
-        if (item.type === 'EXTERNAL' && item.href) {
-            if (item.href.startsWith('/')) {
-                return <Link href={item.href} className={commonClasses}>{item.name}</Link>;
-            } else {
-                return (
-                    <a href={item.href} target="_blank" rel="noopener noreferrer" className={`${commonClasses} flex items-center justify-between`}>
-                        {item.name}
-                        <ExternalLink size={14} className="ml-1" />
-                    </a>
-                );
-            }
+        // Cek apakah href adalah URL eksternal sejati
+        const isExternalUrl = item.href && (item.href.startsWith('http://') || item.href.startsWith('https://'));
+
+        if (isExternalUrl) {
+            return (
+                <a href={item.href} target="_blank" rel="noopener noreferrer" className={`${commonClasses} flex items-center justify-between`}>
+                    {item.name}
+                    <ExternalLink size={14} className="ml-1" />
+                </a>
+            );
+        }
+        
+        // Logika yang diperbaiki untuk link internal dan statis
+        let linkHref: string;
+        if (item.type === 'INTERNAL' && item.post?.id) {
+            linkHref = `/page/${item.post.id}`;
+        } else {
+            // Fallback untuk semua tipe lain (STATIC_PATH, dll)
+            // Jika item.href tidak ada (null/undefined), akan menjadi '#'
+            linkHref = item.href || '#';
         }
 
-        const linkHref = item.post?.id ? `/page/${item.post.id}` : '#';
         return (
             <Link href={linkHref} className={clsx(commonClasses)}>
                 {item.name}
@@ -69,7 +78,6 @@ export default function Header() {
             </Link>
         );
     };
-
 
     return (
         <header className="sticky top-0 z-50 shadow-md bg-white">
